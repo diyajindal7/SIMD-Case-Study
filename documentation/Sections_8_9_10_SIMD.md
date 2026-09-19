@@ -2,33 +2,61 @@
 
 ## 8.1 Data Size vs Execution Time
 
-The performance of the sequential and SIMD implementations was evaluated using different data sizes. The same mathematical operation was performed on every element of the input array using both approaches.
+The performance of the sequential and SIMD implementations was evaluated using four different data sizes:
 
-The execution time was measured using `omp_get_wtime()`. Multiple runs were performed for each data size, and the mean execution time was calculated to obtain more reliable results.
+- 1,000,000 elements
+- 5,000,000 elements
+- 10,000,000 elements
+- 20,000,000 elements
 
-The sequential implementation processes the elements one after another, whereas the SIMD implementation uses vectorization to process multiple elements simultaneously.
+The same mathematical operation was performed on every element:
 
-The execution time comparison is represented using a graph with data size on the X-axis and execution time in seconds on the Y-axis.
+B[i] = A[i]^2 + 2A[i] + 1
 
-**Observation:**  
-As the data size increases, the execution time of both approaches increases. The SIMD implementation can reduce execution time for workloads where sufficient data-level parallelism is available. For very small data sizes, the performance advantage of SIMD may be limited because the overhead of vectorization can become significant compared with the actual computation.
+Execution time was measured using `omp_get_wtime()`. Five runs were performed for each configuration and the mean execution time was calculated.
+
+The sequential implementation processes the elements using a conventional loop, while the SIMD implementation uses the OpenMP `simd` directive to enable vectorization.
+
+The relationship between data size and execution time is represented using the generated performance graphs.
+
+### Observation
+
+For the tested workloads, execution time generally increased as the data size increased.
+
+However, the SIMD implementation did not provide a large performance improvement on the tested system. The measured SIMD speedup remained close to 1× for all tested data sizes.
+
+This indicates that SIMD performance depends not only on the amount of data but also on factors such as compiler vectorization, memory access, processor architecture, and the characteristics of the workload.
 
 ---
 
 ## 8.2 SIMD Speedup Analysis
 
-The performance improvement obtained using SIMD was calculated using the following formula:
+SIMD speedup was calculated using:
 
 **SIMD Speedup = Sequential Execution Time / SIMD Execution Time**
 
-A speedup value greater than 1 indicates that SIMD execution is faster than sequential execution.
+A speedup greater than 1 indicates that SIMD was faster than the sequential implementation.
 
-For this project, a SIMD speedup of **1.5× or greater** is considered a significant performance advantage.
+For this project, a SIMD speedup of **1.5× or greater** is defined as a significant performance advantage.
 
-The relationship between data size and SIMD speedup is represented using a graph. A horizontal reference line at **1.5×** is included to identify workloads that satisfy the defined significance criterion.
+The measured results were:
 
-**Observation:**  
-The SIMD speedup varies with the data size. Some workloads may obtain only a small improvement, while larger or more suitable workloads can obtain a higher speedup. Therefore, SIMD is not assumed to provide the same performance improvement for every workload.
+| Data Size | Sequential Time (s) | SIMD Time (s) | SIMD Speedup | Significant |
+|---:|---:|---:|---:|:---:|
+| 1,000,000 | 0.00160 | 0.00148 | 1.081× | No |
+| 5,000,000 | 0.00852 | 0.00776 | 1.098× | No |
+| 10,000,000 | 0.01944 | 0.02080 | 0.935× | No |
+| 20,000,000 | 0.03256 | 0.03228 | 1.009× | No |
+
+### Observation
+
+The highest measured SIMD speedup was approximately **1.098×** for the 5,000,000-element workload.
+
+The 10,000,000-element workload produced a speedup below 1, meaning that the measured SIMD execution was slightly slower than the sequential execution.
+
+None of the tested workloads reached the project-defined threshold of 1.5×.
+
+Therefore, based on the measured experiments, SIMD did not provide a significant performance advantage for this particular workload on the tested system.
 
 ---
 
@@ -36,109 +64,234 @@ The SIMD speedup varies with the data size. Some workloads may obtain only a sma
 
 ## 9.1 AI Model
 
-An AI-based prediction model was developed to predict whether SIMD execution will provide a significant performance advantage for a given workload.
+An AI-based prediction model was developed to predict whether SIMD execution would provide a significant performance advantage for a given workload.
 
-A **Decision Tree Classifier** was used for this task. The model learns the relationship between workload characteristics and the SIMD performance classification.
+A **Decision Tree Classifier** was used for this task.
 
-The input features used by the model are:
+The input features used by the model were:
 
 - **Data Size** – Number of elements in the numerical dataset.
 - **Operation Complexity** – Represents the complexity of the mathematical operation.
-- **Memory Footprint** – Amount of memory required for processing the input and output arrays.
+- **Memory Footprint** – Memory required for the input and output arrays.
 - **Available CPU Cores** – Number of CPU cores available for computation.
 
-The target variable is:
+The target variable was:
 
-- **0 – SIMD performance advantage is not significant**
-- **1 – SIMD performance advantage is significant**
+- **0** – SIMD performance advantage is not significant.
+- **1** – SIMD performance advantage is significant.
 
-The significance classification is based on the project-defined threshold of **1.5× SIMD speedup**.
+The project-defined significance threshold is:
+
+**SIMD Speedup ≥ 1.5× → Significant**
+
+**SIMD Speedup < 1.5× → Not Significant**
 
 ---
 
 ## 9.2 AI Model Training
 
-The dataset was divided into training and testing data. The training data was used to build the Decision Tree model, while the testing data was used to evaluate its prediction performance.
+A synthetic dataset containing 60 workload samples was used to train the Decision Tree model.
 
-The Decision Tree classifier was configured with a maximum depth of 3 to keep the model simple and suitable for this classification problem.
+The dataset was divided into training and testing sets using an 80:20 split.
+
+The Decision Tree classifier was configured with a maximum depth of 3.
 
 The trained model was saved as:
 
 **`simd_model.pkl`**
 
-The model achieved an accuracy of **100% on the 12 held-out test samples** from the synthetic dataset.
+The model achieved **100% accuracy on the 12 held-out samples from the synthetic test dataset**.
 
-Since the training dataset used in this implementation is synthetic, this accuracy indicates that the model correctly learned the classification pattern present in that dataset. It should not be interpreted as 100% accuracy on real-world workloads.
+This accuracy only describes performance on the held-out samples from the synthetic dataset. It should not be interpreted as 100% accuracy on real-world workloads or on the actual computer used for benchmarking.
 
 ---
 
-## 9.3 AI Prediction Workflow
+## 9.3 AI Prediction and Execution Integration
 
-The AI prediction process is performed before running the actual benchmark.
+The trained AI model was integrated with the execution program.
 
 The workflow is:
 
-**Workload Characteristics → Decision Tree Model → SIMD Prediction → Actual Benchmark → Performance Comparison**
+**Workload Characteristics → Decision Tree → Prediction → Strategy Selection → Actual Execution → Performance Measurement**
 
-For a new workload, the data size, operation complexity, memory footprint, and available CPU cores are provided to the trained model.
+For a new workload, the user provides the data size.
 
-The model then predicts whether SIMD is expected to provide a significant performance advantage.
+The system calculates the corresponding workload features and provides them to the Decision Tree model.
 
-The actual sequential and SIMD execution times are subsequently measured, and the actual SIMD speedup is calculated. The AI prediction is then compared with the actual result.
+The model predicts whether SIMD is expected to provide a significant advantage.
+
+Based on the prediction:
+
+- If the prediction is **1**, the SIMD implementation is selected.
+- If the prediction is **0**, the sequential implementation is selected.
+
+The selected implementation is then executed by the C program and its execution time is measured.
+
+This provides an actual AI-based strategy selection mechanism rather than only displaying a prediction.
 
 ---
 
 # 10. EXPERIMENTAL RESULTS
 
-## 10.1 Benchmark Results
+## 10.1 Final SIMD Benchmark Results
 
-The sequential and SIMD implementations were executed for different data sizes. For each configuration, multiple runs were performed and the mean execution time was calculated.
+The final benchmark was performed using four data sizes.
 
-The SIMD speedup was calculated using:
+Five runs were performed for each configuration and the mean execution time was calculated.
 
-**SIMD Speedup = Sequential Time / SIMD Time**
-
-The classification was obtained using the project-defined threshold:
-
-**SIMD Speedup ≥ 1.5× → Significant**  
-**SIMD Speedup < 1.5× → Not Significant**
-
-The experimental results are presented in the following table.
+The results are:
 
 | Data Size | Mean Sequential Time (s) | Mean SIMD Time (s) | SIMD Speedup | SIMD Significant |
 |---:|---:|---:|---:|:---:|
-| 10,000 | — | — | — | — |
-| 100,000 | — | — | — | — |
-| 1,000,000 | — | — | — | — |
-| 10,000,000 | — | — | — | — |
-| 50,000,000 | — | — | — | — |
+| 1,000,000 | 0.00160 | 0.00148 | 1.081× | No |
+| 5,000,000 | 0.00852 | 0.00776 | 1.098× | No |
+| 10,000,000 | 0.01944 | 0.02080 | 0.935× | No |
+| 20,000,000 | 0.03256 | 0.03228 | 1.009× | No |
 
-**Note:** The values in the table should be replaced with the corresponding values obtained from the final benchmark execution.
-
----
-
-## 10.2 AI Prediction Results
-
-The AI model was tested using previously unseen workload samples. The predicted classification was compared with the actual SIMD significance obtained from the benchmark.
-
-| Test Case | Data Size | AI Prediction | Actual Result | Prediction |
-|---|---:|---:|---:|---|
-| 1 | 10,000 | 0 | 0 | Correct |
-| 2 | 50,000 | 0 | 0 | Correct |
-| 3 | 100,000 | 0 | 0 | Correct |
-| 4 | 500,000 | 1 | 1 | Correct |
-| 5 | 1,000,000 | 1 | 1 | Correct |
-
-**Note:** The final test cases and results should be updated using the actual values obtained from the implemented AI model and benchmark.
+The results show that none of the tested workloads achieved the predefined 1.5× SIMD significance threshold.
 
 ---
 
-## 10.3 Result Discussion
+## 10.2 OpenMP Scheduling Results
 
-The experimental evaluation demonstrates that SIMD performance depends on the characteristics of the workload. The SIMD implementation can provide performance benefits when the workload contains a large number of independent numerical operations that can be processed simultaneously.
+OpenMP parallel execution was also evaluated using:
 
-For smaller workloads, the performance improvement may be limited because the computation itself is small and vectorization overhead can become relatively significant.
+- 1 thread
+- 2 threads
+- 4 threads
+- 8 threads
 
-The AI model provides a prediction of whether the expected SIMD performance advantage is significant based on workload characteristics. The actual benchmark results are used to validate the prediction.
+and three scheduling strategies:
 
-Overall, the implementation demonstrates the complete workflow of **sequential computation, SIMD-based computation, performance measurement, speedup calculation, and AI-based SIMD performance prediction**.
+- Static
+- Dynamic
+- Guided
+
+For the tested workload, dynamic scheduling produced substantially higher execution times than static and guided scheduling.
+
+For example, for 20,000,000 elements using 8 threads:
+
+| Schedule | Mean Time (s) |
+|---|---:|
+| Static | 0.03860 |
+| Guided | 0.03868 |
+| Dynamic | 1.54240 |
+
+The large overhead of dynamic scheduling is expected for this workload because every loop iteration performs approximately the same amount of computation. Dynamic scheduling provides little load-balancing benefit when the workload is already uniform, while its scheduling overhead remains.
+
+The experiment also showed that increasing the number of threads did not necessarily improve execution time. Thread-management overhead, memory access behavior, cache effects, and the relatively simple computation can limit the benefit of additional threads.
+
+---
+
+## 10.3 AI Prediction vs Actual Benchmark
+
+The AI model was trained using a synthetic dataset and was then integrated into the execution system.
+
+For example, when a workload of 1,000,000 elements was entered:
+
+**AI prediction:**
+
+SIMD Performance Advantage = Significant
+
+**Selected strategy:**
+
+SIMD
+
+The selected SIMD implementation was then actually executed by the C program.
+
+However, the independent benchmark results for 1,000,000 elements showed:
+
+**SIMD Speedup = 1.081×**
+
+Since:
+
+**1.081× < 1.5×**
+
+the measured result is classified as:
+
+**SIMD Advantage = Not Significant**
+
+Therefore, the AI prediction did not match the measured result for this workload.
+
+This difference demonstrates an important limitation of the current model. The model was trained using synthetic data whose classification pattern does not fully represent the actual hardware performance behavior observed during benchmarking.
+
+---
+
+## 10.4 Performance Analysis
+
+The experiments demonstrate that SIMD performance is workload- and hardware-dependent.
+
+For the selected mathematical operation:
+
+B[i] = A[i]^2 + 2A[i] + 1
+
+the computation is highly data-parallel because each output element is independent.
+
+However, the measured SIMD speedup was relatively small on the tested system.
+
+The observed speedups ranged from approximately:
+
+**0.935× to 1.098×**
+
+None of the workloads reached the 1.5× significance threshold.
+
+The OpenMP experiments also showed that scheduling overhead can have a major effect on performance. Dynamic scheduling was considerably slower than static and guided scheduling for the uniform workload because there was little need for dynamic load balancing.
+
+---
+
+## 10.5 Optimization Discussion
+
+Based on the experimental results, several improvements could be considered.
+
+### 1. Use representative training data
+
+The current AI model uses a synthetic dataset. A stronger model could be trained using benchmark measurements collected from the actual target system.
+
+### 2. Include more workload features
+
+Additional features could include:
+
+- CPU architecture
+- vector instruction width
+- cache size
+- memory bandwidth
+- compiler optimization level
+- measured baseline execution time
+
+### 3. Increase the number of benchmark samples
+
+More data sizes and repeated measurements could provide a more representative training dataset.
+
+### 4. Reduce scheduling overhead
+
+For uniform workloads, static scheduling can avoid the additional scheduling overhead associated with dynamic scheduling.
+
+### 5. Use compiler optimization
+
+Compiler optimization and hardware vectorization support can significantly affect SIMD performance. Therefore, consistent compiler flags and experimental conditions should be maintained when comparing implementations.
+
+---
+
+## 10.6 Final Conclusion
+
+This case study implemented and evaluated SIMD-oriented numerical data processing.
+
+The same mathematical operation:
+
+B[i] = A[i]^2 + 2A[i] + 1
+
+was implemented using sequential and SIMD approaches.
+
+The experiment demonstrated that the computation contains a high degree of data parallelism because each element can be processed independently.
+
+Performance measurements were collected for multiple data sizes, and SIMD speedup was calculated relative to the sequential baseline.
+
+For the tested workloads, SIMD speedup ranged from approximately 0.935× to 1.098×, and none reached the predefined 1.5× significance threshold.
+
+OpenMP scheduling experiments demonstrated that scheduling strategy can significantly affect performance. Dynamic scheduling introduced considerable overhead for the uniform workload, while static and guided scheduling produced much lower measured times in the tested configurations.
+
+A Decision Tree AI model was also developed to predict whether SIMD would provide a significant performance advantage. The model achieved 100% accuracy on the held-out samples of its synthetic test dataset. The model was then integrated with the execution system so that its prediction could select either SIMD or sequential execution.
+
+The comparison between AI predictions and actual benchmark results showed that the current synthetic training data does not fully represent the behavior of the real hardware. This provides an opportunity for future improvement by training the model using larger and more representative real benchmark datasets.
+
+Overall, the project demonstrates the complete workflow of **sequential computation, SIMD processing, OpenMP parallel scheduling, performance measurement, AI-based prediction, strategy selection, and experimental evaluation**.

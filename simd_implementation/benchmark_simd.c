@@ -1,22 +1,57 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
+#include <string.h>
+#define RUNS 5
 
-#define RUNS 7
-#define INNER_REPETITIONS 100
+static void sequential(
+    const double *A,
+    double *B,
+    long long N)
+{
+    for (long long i = 0; i < N; i++)
+    {
+        B[i] = A[i] * A[i] + 2.0 * A[i] + 1.0;
+    }
+}
+
+static void simd(
+    const double *A,
+    double *B,
+    long long N)
+{
+#pragma omp simd
+    for (long long i = 0; i < N; i++)
+    {
+        B[i] = A[i] * A[i] + 2.0 * A[i] + 1.0;
+    }
+}
+
+static double checksum(
+    const double *B,
+    long long N)
+{
+    double sum = 0.0;
+
+    for (long long i = 0; i < N; i++)
+    {
+        sum += B[i];
+    }
+
+    return sum;
+}
 
 int main(int argc, char *argv[])
 {
-    // =======================================
-    // 1. Check data size
-    // =======================================
-    if (argc < 2)
+    if (argc < 3)
     {
-        printf("Error: Data size not provided.\n");
+        printf("Usage: benchmark_simd.exe <data_size> <strategy>\n");
+        printf("Strategy: sequential or simd\n");
         return 1;
     }
 
     long long N = atoll(argv[1]);
+    const char *strategy = argv[2];
 
     if (N <= 0)
     {
@@ -24,129 +59,65 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // =======================================
-    // 2. Allocate arrays
-    // =======================================
-    double *A = (double *)malloc(N * sizeof(double));
-    double *B = (double *)malloc(N * sizeof(double));
-
-    if (A == NULL || B == NULL)
+    if (strcmp(strategy, "sequential") != 0 &&
+        strcmp(strategy, "simd") != 0)
     {
-        printf("Memory allocation failed!\n");
+        printf("Error: Strategy must be sequential or simd.\n");
         return 1;
     }
 
-    // =======================================
-    // 3. Initialize input data
-    // =======================================
+    double *A =
+        malloc((size_t)N * sizeof(double));
+
+    double *B =
+        malloc((size_t)N * sizeof(double));
+
+    if (A == NULL || B == NULL)
+    {
+        printf("Memory allocation failed.\n");
+        free(A);
+        free(B);
+        return 1;
+    }
+
     for (long long i = 0; i < N; i++)
     {
         A[i] = i * 0.001;
     }
 
-    double sequential_total = 0.0;
-    double simd_total = 0.0;
+    double total_time = 0.0;
+    double final_checksum = 0.0;
 
-    // =======================================
-    // 4. Sequential benchmark
-    // =======================================
     for (int run = 0; run < RUNS; run++)
     {
         double start = omp_get_wtime();
 
-        for (int repeat = 0; repeat < INNER_REPETITIONS; repeat++)
+        if (strcmp(strategy, "simd") == 0)
         {
-            for (long long i = 0; i < N; i++)
-            {
-                B[i] = A[i] * A[i] + 2 * A[i] + 1;
-            }
+            simd(A, B, N);
+        }
+        else
+        {
+            sequential(A, B, N);
         }
 
         double end = omp_get_wtime();
 
-        sequential_total += (end - start);
+        total_time += end - start;
+        final_checksum = checksum(B, N);
     }
 
-    // =======================================
-    // 5. SIMD benchmark
-    // =======================================
-    for (int run = 0; run < RUNS; run++)
-    {
-        double start = omp_get_wtime();
+    double mean_time = total_time / RUNS;
 
-        for (int repeat = 0; repeat < INNER_REPETITIONS; repeat++)
-        {
-            #pragma omp simd
-            for (long long i = 0; i < N; i++)
-            {
-                B[i] = A[i] * A[i] + 2 * A[i] + 1;
-            }
-        }
-
-        double end = omp_get_wtime();
-
-        simd_total += (end - start);
-    }
-
-    // =======================================
-    // 6. Calculate mean time
-    // =======================================
-    double sequential_mean =
-        sequential_total / RUNS / INNER_REPETITIONS;
-
-    double simd_mean =
-        simd_total / RUNS / INNER_REPETITIONS;
-
-    // =======================================
-    // 7. Calculate SIMD speedup
-    // =======================================
-    double simd_speedup = sequential_mean / simd_mean;
-
-    // =======================================
-    // 8. Determine SIMD significance
-    // =======================================
-    int simd_significant;
-
-    if (simd_speedup >= 1.5)
-    {
-        simd_significant = 1;
-    }
-    else
-    {
-        simd_significant = 0;
-    }
-
-    // =======================================
-    // 9. Display results
-    // =======================================
     printf("Data Size: %lld\n", N);
+    printf("Strategy: %s\n", strategy);
     printf("Runs: %d\n", RUNS);
-    printf("Inner Repetitions: %d\n", INNER_REPETITIONS);
+    printf("Mean Execution Time: %.9f seconds\n", mean_time);
+    printf("Checksum: %.6f\n", final_checksum);
 
-    printf("Mean Sequential Time: %.9f\n",
-           sequential_mean);
+    printf("B[0]: %.6f\n", B[0]);
+    printf("B[%lld]: %.6f\n", N - 1, B[N - 1]);
 
-    printf("Mean SIMD Time: %.9f\n",
-           simd_mean);
-
-    printf("SIMD Speedup: %.4f\n",
-           simd_speedup);
-
-    printf("SIMD Significant: %d\n",
-           simd_significant);
-
-    // =======================================
-    // 10. Verify output
-    // =======================================
-    printf("B[0]: %f\n", B[0]);
-
-    printf("B[%lld]: %f\n",
-           N - 1,
-           B[N - 1]);
-
-    // =======================================
-    // 11. Free memory
-    // =======================================
     free(A);
     free(B);
 
