@@ -1,12 +1,13 @@
 import pandas as pd
 import pickle
-
+from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
 
 # Load the dataset
-data = pd.read_csv("simd_ai_dataset_60.csv")
+script_dir = Path(__file__).resolve().parent
+data = pd.read_csv(script_dir / "simd_ai_dataset_60.csv")
 
 print("Dataset loaded successfully!")
 print("Number of rows:", len(data))
@@ -73,9 +74,10 @@ print(classification_report(
     zero_division=0
 ))
 
-# Save trained model
-with open("simd_model.pkl", "wb") as file:
+model_path = script_dir / "simd_model.pkl"
+
+with open(model_path, "wb") as file:
     pickle.dump(model, file)
 
 print("\nAI model saved successfully!")
-print("File: simd_model.pkl")
+print(f"File: {model_path}")
